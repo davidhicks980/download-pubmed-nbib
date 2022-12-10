@@ -17,43 +17,43 @@ const buildNbibDownloadUrl = (id: string) =>
  *
  * @export
  * @param {string} query - Unencoded pubmed query phrase
- * @param {string} outputFolder - Path in which NBIB files should be written
+ * @param {string} outputFolder - NBIB write folder
  */
 export async function writeNbibFilesToOutput(
   query: string,
   outputFolder: string
 ) {
-  // Get pubmed ids from search query
+  // Get PMID from search query
   const pubmedIdResponse = await fetch(pubmedBaseUrl + encodeURI(query));
   const pubmedIdText = await pubmedIdResponse.text();
 
-  // Parse Id file to xml
+  // Parse response text to xml
   const xml = new xmldoc.XmlDocument(pubmedIdText);
 
   // Filter IdList for elements and retrieve Id value
-  const ids = xml
-    .childNamed('IdList')
-    ?.children.filter(child => child.type === 'element')
-    .map(child => (child as xmldoc.XmlElement).val);
+  const pmidList =
+    xml
+      .childNamed('IdList')
+      ?.children.filter(child => child.type === 'element')
+      .map(child => (child as xmldoc.XmlElement).val) ?? [];
 
-  //Write to output folder in pwd
+  // Write to output folder in pwd
   const writeFolder = path.join(__dirname, outputFolder);
 
   // Make output directory if one does not exist.
   // Not sure if this is the right way to do it -- this is how Go handles it
   await stat(writeFolder).catch(() => mkdirSync(writeFolder));
 
-  // Go through each pubmedId and fetch the NBIB file from pubmed
-  while (ids?.length) {
-    const id = ids.shift() as string;
+  // Go through each PMID and fetch the corresponding NBIB file from pubmed
+  for (let id of pmidList) {
     const downloadUrl = buildNbibDownloadUrl(id);
     const downloadResponse = await fetch(downloadUrl);
     const nbibFile = await downloadResponse.arrayBuffer();
 
-    // For non relative paths, you can use __dirname
+    // For absolute paths, you can use __dirname
     const savePath = path.join(writeFolder, `${id}.nbib`);
 
-    // Write nbib file to output folder
+    // Write NBIB file to output folder
     writeFile(savePath, Buffer.from(nbibFile));
 
     // Pubmed is rate limited to 3 requests per second.
